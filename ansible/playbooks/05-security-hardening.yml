@@ -1,0 +1,12 @@
+---
+# 05-security-hardening.yml (placeholder)
+# This playbook will be implemented after scope is finalized.
+# Secrets must be sourced from ansible/vault.yml and executed with --ask-vault-pass.
+
+- name: 05-security-hardening placeholder
+  hosts: all
+  become: true
+  tasks:
+    - name: Placeholder
+      ansible.builtin.debug:
+        msg: "05-security-hardening not implemented yet"

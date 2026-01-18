@@ -1,0 +1,12 @@
+---
+# 08-restore.yml (placeholder)
+# This playbook will be implemented after scope is finalized.
+# Secrets must be sourced from ansible/vault.yml and executed with --ask-vault-pass.
+
+- name: 08-restore placeholder
+  hosts: all
+  become: true
+  tasks:
+    - name: Placeholder
+      ansible.builtin.debug:
+        msg: "08-restore not implemented yet"

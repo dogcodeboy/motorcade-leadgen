@@ -1,0 +1,5 @@
+# Non-secret defaults
+leadgen_domain: leadgen.motorcade.vip
+leadgen_root: /opt/motorcade-leadgen
+leadgen_data_root: /var/lib/motorcade-leadgen
+leadgen_log_root: /var/log/motorcade-leadgen

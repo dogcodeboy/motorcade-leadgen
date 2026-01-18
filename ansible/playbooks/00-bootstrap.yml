@@ -1,0 +1,12 @@
+---
+# 00-bootstrap.yml (placeholder)
+# This playbook will be implemented after scope is finalized.
+# Secrets must be sourced from ansible/vault.yml and executed with --ask-vault-pass.
+
+- name: 00-bootstrap placeholder
+  hosts: all
+  become: true
+  tasks:
+    - name: Placeholder
+      ansible.builtin.debug:
+        msg: "00-bootstrap not implemented yet"

@@ -1,0 +1,12 @@
+---
+# 04-doc-generator.yml (placeholder)
+# This playbook will be implemented after scope is finalized.
+# Secrets must be sourced from ansible/vault.yml and executed with --ask-vault-pass.
+
+- name: 04-doc-generator placeholder
+  hosts: all
+  become: true
+  tasks:
+    - name: Placeholder
+      ansible.builtin.debug:
+        msg: "04-doc-generator not implemented yet"

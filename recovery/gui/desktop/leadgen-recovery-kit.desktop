@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=LeadGen Recovery Kit
+Comment=Motorcade LeadGen local backup mini-app (spec scaffold)
+Exec=echo "Recovery Kit not implemented yet"
+Icon=utilities-terminal
+Terminal=true
+Categories=Utility;

@@ -1,0 +1,12 @@
+---
+# 03-scheduler.yml (placeholder)
+# This playbook will be implemented after scope is finalized.
+# Secrets must be sourced from ansible/vault.yml and executed with --ask-vault-pass.
+
+- name: 03-scheduler placeholder
+  hosts: all
+  become: true
+  tasks:
+    - name: Placeholder
+      ansible.builtin.debug:
+        msg: "03-scheduler not implemented yet"
