@@ -1,0 +1,6 @@
+---
+- name: Motorcade LeadGen API Container (build + deploy)
+  hosts: leadgen
+  become: true
+  roles:
+    - leadgen-api

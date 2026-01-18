@@ -1,0 +1,74 @@
+---
+- name: Preflight - require leadgen_secret_key
+  ansible.builtin.assert:
+    that:
+      - leadgen_secret_key is defined
+      - (leadgen_secret_key | length) >= 24
+    fail_msg: "leadgen_secret_key must be defined in vault.yml and be >= 24 chars."
+
+- name: Ensure install/state/log directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ leadgen_install_root }}", mode: "0755" }
+    - { path: "{{ leadgen_state_root }}", mode: "0755" }
+    - { path: "{{ leadgen_log_root }}", mode: "0755" }
+    - { path: "{{ leadgen_secret_dir }}", mode: "0700" }
+
+- name: Write LeadGen env secrets file
+  ansible.builtin.copy:
+    dest: "{{ leadgen_env_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      # Managed by Ansible (Motorcade LeadGen)
+      LEADGEN_SECRET_KEY={{ leadgen_secret_key }}
+      LEADGEN_ENV=prod
+      LEADGEN_VERSION={{ leadgen_image_tag }}
+
+- name: Sync LeadGen API source into install root
+  ansible.posix.synchronize:
+    src: "{{ playbook_dir }}/../../app/api/"
+    dest: "{{ leadgen_install_root }}/app/api/"
+    recursive: true
+    delete: true
+  delegate_to: localhost
+
+- name: Build container image (podman)
+  ansible.builtin.command:
+    cmd: "podman build -t {{ leadgen_image_name }}:{{ leadgen_image_tag }} -f Containerfile ."
+    chdir: "{{ leadgen_install_root }}/app/api"
+  register: build_out
+  changed_when: "'Successfully tagged' in (build_out.stdout | default('')) or build_out.rc == 0"
+
+- name: Install Quadlet container unit
+  ansible.builtin.template:
+    src: leadgen-api.container.j2
+    dest: "/etc/containers/systemd/{{ leadgen_service_name }}.container"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - systemd daemon reload
+
+- name: Enable and start LeadGen API service
+  ansible.builtin.systemd:
+    name: "{{ leadgen_service_name }}"
+    enabled: true
+    state: started
+  register: svc
+
+- name: Verify /health endpoint (local)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ leadgen_host_port }}/health"
+    return_content: true
+    status_code: 200
+  register: health
+  retries: 15
+  delay: 2
+  until: health.status == 200

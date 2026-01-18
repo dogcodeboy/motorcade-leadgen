@@ -1,0 +1,9 @@
+---
+- name: systemd daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart leadgen api
+  ansible.builtin.systemd:
+    name: "{{ leadgen_service_name }}"
+    state: restarted

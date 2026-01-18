@@ -1,0 +1,16 @@
+---
+leadgen_install_root: /opt/motorcade-leadgen
+leadgen_state_root: /var/lib/motorcade-leadgen
+leadgen_log_root: /var/log/motorcade-leadgen
+
+leadgen_image_name: "localhost/motorcade-leadgen-api"
+leadgen_image_tag: "0.2.0"
+leadgen_container_port: 8080
+leadgen_host_port: 18080
+
+leadgen_service_name: "leadgen-api"
+leadgen_secret_dir: "{{ leadgen_install_root }}/secrets"
+leadgen_env_file: "{{ leadgen_secret_dir }}/leadgen.env"
+
+# REQUIRED: set in vault.yml (example)
+# leadgen_secret_key: "<random>"
