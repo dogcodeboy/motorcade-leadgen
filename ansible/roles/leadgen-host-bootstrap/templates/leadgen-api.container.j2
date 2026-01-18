@@ -1,0 +1,37 @@
+# Managed by Motorcade LeadGen Ansible
+# Quadlet container unit. Enable with: systemctl enable --now leadgen-api
+
+[Unit]
+Description=Motorcade LeadGen API (container)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image={{ leadgen_api_image | default('leadgen-api:local') }}
+ContainerName=leadgen-api
+AutoUpdate=registry
+
+# Bind to loopback only; Nginx is the edge
+PublishPort={{ leadgen_bind_host }}:{{ leadgen_api_port }}:8080
+
+Environment=LEADGEN_ENV=prod
+Environment=LEADGEN_DOMAIN={{ leadgen_domain }}
+
+# Secrets are injected by environment file generated from vault.yml
+EnvironmentFile={{ leadgen_root }}/env/leadgen.env
+
+Volume={{ leadgen_data_root }}:/var/lib/leadgen:Z
+Volume={{ leadgen_log_root }}:/var/log/leadgen:Z
+
+# Hardening
+NoNewPrivileges=true
+ReadOnly=true
+Tmpfs=/tmp:rw,nosuid,nodev,size=64m
+Tmpfs=/run:rw,nosuid,nodev,size=16m
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

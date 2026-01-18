@@ -1,12 +1,14 @@
 ---
-# 00-bootstrap.yml (placeholder)
-# This playbook will be implemented after scope is finalized.
+# 00-bootstrap.yml
+# Host bootstrap for Motorcade LeadGen (containerized). WordPress/LEMP remains separate.
 # Secrets must be sourced from ansible/vault.yml and executed with --ask-vault-pass.
 
-- name: 00-bootstrap placeholder
+- name: 00-bootstrap | Host prereqs, directories, nginx proxy, SELinux, quadlet stub
   hosts: all
   become: true
-  tasks:
-    - name: Placeholder
-      ansible.builtin.debug:
-        msg: "00-bootstrap not implemented yet"
+
+  vars_files:
+    - ../vault.yml
+
+  roles:
+    - role: leadgen-host-bootstrap

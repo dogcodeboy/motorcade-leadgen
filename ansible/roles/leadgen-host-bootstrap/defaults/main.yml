@@ -1,0 +1,29 @@
+---
+leadgen_domain: "leadgen.motorcade.vip"
+
+# Host paths (no overlap with /var/www)
+leadgen_root: "/opt/motorcade-leadgen"
+leadgen_data_root: "/var/lib/motorcade-leadgen"
+leadgen_log_root: "/var/log/motorcade-leadgen"
+
+# Runtime user
+leadgen_user: "leadgen"
+leadgen_group: "leadgen"
+
+# Container networking
+leadgen_bind_host: "127.0.0.1"
+leadgen_api_port: 18080
+leadgen_health_port: 18081
+
+# Nginx
+leadgen_nginx_conf_dir: "/etc/nginx/conf.d"
+leadgen_nginx_conf_name: "leadgen.motorcade.vip.conf"
+
+# Packages
+leadgen_packages:
+  - podman
+  - jq
+  - git
+  - curl
+  - policycoreutils-python-utils
+  - firewalld

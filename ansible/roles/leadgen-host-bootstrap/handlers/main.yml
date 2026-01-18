@@ -1,0 +1,10 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart nginx
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+  when: leadgen_manage_nginx | default(true) | bool

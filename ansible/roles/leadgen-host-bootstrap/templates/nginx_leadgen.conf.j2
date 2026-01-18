@@ -1,0 +1,26 @@
+# Managed by Motorcade LeadGen Ansible
+# Purpose: Reverse proxy ONLY for leadgen.motorcade.vip -> containerized LeadGen API
+# Constraint: No overlap with /var/www (WordPress stays isolated)
+
+server {
+    listen 80;
+    server_name {{ leadgen_domain }};
+
+    # Health endpoint (nginx-level)
+    location = /_nginx_health {
+        return 200 'ok';
+        add_header Content-Type text/plain;
+    }
+
+    location / {
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Request-Id $request_id;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+
+        proxy_pass http://{{ leadgen_bind_host }}:{{ leadgen_api_port }};
+    }
+}

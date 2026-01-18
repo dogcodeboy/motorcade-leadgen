@@ -1,0 +1,132 @@
+---
+- name: Ensure firewalld installed and enabled
+  ansible.builtin.package:
+    name: firewalld
+    state: present
+
+- name: Enable and start firewalld
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: true
+
+- name: Install host packages for LeadGen runtime
+  ansible.builtin.package:
+    name: "{{ leadgen_packages }}"
+    state: present
+
+- name: Ensure leadgen group exists
+  ansible.builtin.group:
+    name: "{{ leadgen_group }}"
+    state: present
+
+- name: Ensure leadgen user exists (no login shell)
+  ansible.builtin.user:
+    name: "{{ leadgen_user }}"
+    group: "{{ leadgen_group }}"
+    home: "{{ leadgen_root }}"
+    create_home: false
+    shell: /sbin/nologin
+    system: true
+
+- name: Create required directories (no overlap with /var/www)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ leadgen_user }}"
+    group: "{{ leadgen_group }}"
+    mode: "0750"
+  loop:
+    - "{{ leadgen_root }}"
+    - "{{ leadgen_root }}/config"
+    - "{{ leadgen_root }}/secrets"
+    - "{{ leadgen_root }}/containers"
+    - "{{ leadgen_data_root }}"
+    - "{{ leadgen_data_root }}/db"
+    - "{{ leadgen_data_root }}/uploads"
+    - "{{ leadgen_log_root }}"
+
+- name: Set SELinux boolean so nginx can proxy to localhost (httpd_can_network_connect)
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: true
+    persistent: true
+  when: leadgen_manage_nginx | default(true) | bool
+
+- name: Drop nginx reverse proxy config for LeadGen subdomain
+  ansible.builtin.template:
+    src: nginx_leadgen.conf.j2
+    dest: "{{ leadgen_nginx_conf_dir }}/{{ leadgen_nginx_conf_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart nginx
+  when: leadgen_manage_nginx | default(true) | bool
+
+- name: Validate nginx configuration
+  ansible.builtin.command: nginx -t
+  register: nginx_test
+  changed_when: false
+  when: leadgen_manage_nginx | default(true) | bool
+
+- name: Ensure nginx is enabled and running
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+  when: leadgen_manage_nginx | default(true) | bool
+
+- name: Create Quadlet directory for system podman units
+  ansible.builtin.file:
+    path: /etc/containers/systemd
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write LeadGen API Quadlet unit (image to be provided in later playbooks)
+  ansible.builtin.copy:
+    dest: /etc/containers/systemd/leadgen-api.container
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Motorcade LeadGen API (container)
+      Wants=network-online.target
+      After=network-online.target
+
+      [Container]
+      # Image will be built/deployed in playbook 01
+      Image=localhost/motorcade-leadgen-api:latest
+      ContainerName=leadgen-api
+      PublishPort={{ leadgen_bind_host }}:{{ leadgen_api_port }}:8080
+      # Mounts
+      Volume={{ leadgen_root }}/config:/app/config:Z
+      Volume={{ leadgen_data_root }}:/var/lib/leadgen:Z
+      Volume={{ leadgen_log_root }}:/var/log/leadgen:Z
+      # Env
+      Environment=LEADGEN_ENV=production
+      # Do NOT put secrets here; use playbook 01 to inject from vault
+
+      [Service]
+      Restart=always
+      TimeoutStartSec=120
+      TimeoutStopSec=60
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Reload systemd
+
+- name: Enable LeadGen API container service (will run once image exists)
+  ansible.builtin.systemd:
+    name: leadgen-api.service
+    enabled: true
+    state: stopped
+  notify: Reload systemd
+
+- name: Report next action required (build/deploy image)
+  ansible.builtin.debug:
+    msg:
+      - "Bootstrap complete. Next: run playbook 01-leadgen-app to build/deploy localhost/motorcade-leadgen-api:latest."
+      - "Nginx now proxies http://{{ leadgen_domain }} -> {{ leadgen_bind_host }}:{{ leadgen_api_port }}."
