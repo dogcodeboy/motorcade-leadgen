@@ -1,0 +1,6 @@
+---
+- name: Motorcade LeadGen App Container
+  hosts: leadgen
+  become: true
+  roles:
+    - leadgen-app
