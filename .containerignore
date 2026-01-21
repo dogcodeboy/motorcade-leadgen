@@ -1,0 +1,22 @@
+# Container build context ignores (works with Podman/Docker)
+.git/
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.env
+*.env
+.venv/
+venv/
+dist/
+build/
+node_modules/
+*.sqlite
+*.db
+secrets/
+.run/
+.coverage
+.mypy_cache/
+.pytest_cache/
