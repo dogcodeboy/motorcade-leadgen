@@ -37,4 +37,5 @@ curl http://localhost:8000/lead/health
 
 - Port `8000` is for **internal service** traffic. Do **not** open it publicly in AWS.
 - Production secrets are injected by `motorcade-infra` via Ansible vault and mounted env files (e.g., `/run/secrets/leadgen.env`).
+- Requirements are sourced from `app/api/requirements.txt` during the container build.
 - Queue integration is **queue-first**; current enqueue behavior may be stubbed until PLAT_04 wires a real queue.

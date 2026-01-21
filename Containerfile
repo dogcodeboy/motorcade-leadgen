@@ -15,12 +15,11 @@ ENV PYTHONDONTWRITEBYTECODE=1     PYTHONUNBUFFERED=1     PIP_NO_CACHE_DIR=1
 WORKDIR /app
 
 # System deps (kept minimal)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends     ca-certificates  && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps
-COPY requirements.txt /app/requirements.txt
+# NOTE: requirements.txt lives under app/api/ in this repo.
+COPY app/api/requirements.txt /app/requirements.txt
 RUN python -m pip install --upgrade pip && pip install -r /app/requirements.txt
 
 # Copy app code
