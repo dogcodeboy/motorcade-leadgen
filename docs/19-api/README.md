@@ -1,26 +1,33 @@
-# Playbook 02 — LeadGen API Container (Build + Deploy)
+# LeadGen API (Lead Intake) — v1
 
-This checkpoint introduces the **first running component** of the LeadGen system: a minimal API container.
+This repo implements the **Lead Intake API** for the Motorcade LeadGen system.
 
-## Endpoints
-- `GET /health` → `{ "status": "ok" }`
-- `GET /version` → `{ service, version, env }`
+## Authoritative Contract
+- See: `docs/19-api/lead-intake-v1.md`
+
+## Endpoints (v1)
+- `GET /lead/health` → liveness/readiness (no auth)
+- `POST /lead/intake` → validate + accept + enqueue (**202 Accepted**) (requires `X-API-Key`)
+- `GET /version` → internal convenience endpoint
 
 ## Security posture
+- Service port is **internal-only** (do not open 8000 to the internet).
+- Use a reverse proxy later (infra playbook PLAT_06) to expose only 443.
 - Secrets are injected from `vault.yml` into `{{ leadgen_install_root }}/secrets/leadgen.env` (mode `0600`).
-- Quadlet mounts secrets read-only path and uses `EnvironmentFile=/run/secrets/leadgen.env`.
-- Container drops all Linux capabilities and sets `NoNewPrivileges=true`.
 
-## Run
+## Required secrets (env)
+- `LEADGEN_API_KEY` (shared secret used for `X-API-Key`)
+
+## Idempotency
+- Optional header: `Idempotency-Key`
+- Same key + same payload returns the same `intake_id`
+- Same key + different payload returns **409**
+
+## Run (when you are ready)
 From `motorcade-leadgen/ansible`:
 
 ```bash
 ansible-playbook -i inventory/production.yml playbooks/02-api.yml --ask-vault-pass
 ```
 
-## Vault requirement
-Add to `ansible/vault.yml`:
-
-```yaml
-leadgen_secret_key: "<32+ chars random>"
-```
+> Note: deployment/testing is not active yet; this doc and the contract are being locked before infra wiring.
