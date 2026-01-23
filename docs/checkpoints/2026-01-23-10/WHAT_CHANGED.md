@@ -1,0 +1,4 @@
+- Added deprecated playbooks policy
+- Ensured playbooks/deprecated folder exists
+- Generated docs/reports/PURGE_CANDIDATES.md
+- motorcade-infra: moved PLAT_07* into deprecated, updated RUNBOOK references, and marked PLAT_05* as PROHIBITED (nginx frozen)

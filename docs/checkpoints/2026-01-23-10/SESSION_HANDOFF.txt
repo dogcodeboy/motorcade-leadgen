@@ -1,0 +1,3 @@
+SESSION HANDOFF — motorcade-leadgen
+
+Deprecated cleanup applied. See docs/reports/PURGE_CANDIDATES.md.
