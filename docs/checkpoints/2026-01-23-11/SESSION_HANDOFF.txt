@@ -1,0 +1,12 @@
+SESSION HANDOFF — motorcade-leadgen
+
+State:
+- Cleanup phase: establish canonical deprecation policy.
+- Nginx is frozen/verified; do not reopen.
+
+Changes in this checkpoint:
+- Added checkpoint docs: docs/checkpoints/2026-01-23-11/
+- (infra only) Updated docs/RUNBOOK.md with canonical deprecation policy and next steps.
+
+Next:
+- Proceed with Podman / container services subsystem (PLAT_08A+).
