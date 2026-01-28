@@ -287,8 +287,14 @@ def lead_health():
 
 @app.get("/version")
 def version():
-    # Optional, internal convenience
-    return {"service": SERVICE_NAME, "version": SERVICE_VERSION, "env": ENV_NAME}
+    # Optional, internal convenience (also used for auditability)
+    return {
+        "service": SERVICE_NAME,
+        "version": SERVICE_VERSION,
+        "env": ENV_NAME,
+        "git_sha": os.getenv("LEADGEN_GIT_SHA", "unknown"),
+        "build_time": os.getenv("LEADGEN_BUILD_TIME", "unknown"),
+    }
 
 
 @app.post("/lead/intake", status_code=202)

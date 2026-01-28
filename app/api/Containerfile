@@ -1,7 +1,21 @@
 FROM python:3.12-slim
 
+# Build metadata (optional but strongly recommended for auditability)
+ARG LEADGEN_GIT_SHA=unknown
+ARG LEADGEN_BUILD_TIME=unknown
+ARG LEADGEN_SOURCE_URL=unknown
+
+LABEL org.opencontainers.image.title="motorcade-leadgen-api" \
+      org.opencontainers.image.revision="$LEADGEN_GIT_SHA" \
+      org.opencontainers.image.created="$LEADGEN_BUILD_TIME" \
+      org.opencontainers.image.source="$LEADGEN_SOURCE_URL"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+
+# Surface build metadata at runtime (read by /version)
+ENV LEADGEN_GIT_SHA=$LEADGEN_GIT_SHA \
+    LEADGEN_BUILD_TIME=$LEADGEN_BUILD_TIME
 
 WORKDIR /app
 

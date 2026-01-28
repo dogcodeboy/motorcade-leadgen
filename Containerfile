@@ -10,6 +10,15 @@
 
 FROM python:3.11-slim
 
+ARG LEADGEN_GIT_SHA=unknown
+ARG LEADGEN_BUILD_TIME=unknown
+ARG LEADGEN_SOURCE_URL=unknown
+
+LABEL org.opencontainers.image.title="motorcade-leadgen-api" \
+      org.opencontainers.image.revision="$LEADGEN_GIT_SHA" \
+      org.opencontainers.image.created="$LEADGEN_BUILD_TIME" \
+      org.opencontainers.image.source="$LEADGEN_SOURCE_URL"
+
 ENV PYTHONDONTWRITEBYTECODE=1     PYTHONUNBUFFERED=1     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
@@ -26,7 +35,8 @@ RUN python -m pip install --upgrade pip && pip install -r /app/requirements.txt
 COPY app /app/app
 
 # Default env (override via env-file or secrets mount)
-ENV LEADGEN_SERVICE_NAME=lead-intake-api     LEADGEN_VERSION=v1     LEADGEN_ENV=dev
+ENV LEADGEN_SERVICE_NAME=lead-intake-api     LEADGEN_VERSION=v1     LEADGEN_ENV=dev \
+    LEADGEN_GIT_SHA=$LEADGEN_GIT_SHA         LEADGEN_BUILD_TIME=$LEADGEN_BUILD_TIME
 
 EXPOSE 8000
 
