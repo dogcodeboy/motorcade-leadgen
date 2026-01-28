@@ -127,7 +127,7 @@ def _enqueue_intake_job(
     """
 
     # Wrap payload with meta so the worker can write app.leads without relying on
-    in-memory state.
+    # in-memory state.
     job_payload = {
         "meta": {
             "intake_id": intake_id,
