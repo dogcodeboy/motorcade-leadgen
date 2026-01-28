@@ -194,13 +194,23 @@ def _insert_lead(conn: psycopg.Connection, *, intake_id: str, request_id: str, r
     if "city" in cols and isinstance(loc, dict):
         record["city"] = loc.get("city")
 
-    # Always store the raw payload in the chosen JSON column
-    # psycopg will adapt dict -> json/jsonb.
-    record[json_col] = payload
+    # Always store the raw payload in the chosen JSON column.
+    # IMPORTANT: Do NOT pass a Python dict directly here.
+    # psycopg3 adapter behavior can vary by build; we keep this stable by
+    # inserting a JSON string and explicitly casting to jsonb in SQL.
+    payload_json = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+    record[json_col] = payload_json
 
     columns = list(record.keys())
-    placeholders = ["%s"] * len(columns)
-    values = [record[c] for c in columns]
+    placeholders: list[str] = []
+    values: list[Any] = []
+    for c in columns:
+        if c == json_col and cols.get(json_col) == "jsonb":
+            placeholders.append("%s::jsonb")
+        else:
+            placeholders.append("%s")
+        values.append(record[c])
+
     sql = f"INSERT INTO app.leads ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
 
     with conn.cursor() as cur:

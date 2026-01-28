@@ -8,4 +8,3 @@ psycopg[binary]==3.2.3
 
 # Extras required for EmailStr validation (Pydantic)
 pydantic[email]
-psycopg[binary]
