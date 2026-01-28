@@ -38,9 +38,9 @@ DB_SSLMODE = os.getenv("LEADGEN_DB_SSLMODE", "disable")
 
 app = FastAPI(title="Motorcade Lead Intake API", version=SERVICE_VERSION)
 
-# --- Idempotency (in-memory for now; replace with Redis/DB later) ---
-# Map: idempotency_key -> payload_hash, intake_id, request_id, received_at_utc
-_IDEMPOTENCY_STORE: Dict[str, Dict[str, str]] = {}
+# --- Idempotency ---
+# LEADGEN_07C: enforced via Postgres intake_jobs.idempotency_key (unique) with
+# payload match checking at enqueue time.
 
 
 def _now_utc_iso() -> str:
@@ -103,6 +103,95 @@ def _build_dsn() -> str:
 
 
 _CACHED_LEADS_COLUMNS: Optional[Dict[str, str]] = None  # col_name -> udt_name
+
+
+def _enqueue_intake_job(
+    conn: psycopg.Connection,
+    *,
+    idempotency_key: Optional[str],
+    intake_id: str,
+    request_id: str,
+    received_at_utc: str,
+    lead_source: str,
+    payload: Dict[str, Any],
+) -> Dict[str, str]:
+    """Enqueue a durable intake job.
+
+    LEADGEN_07C contract:
+    - /lead/intake returns 202 once the job is durably enqueued.
+    - If Idempotency-Key is reused with the same payload, return the original meta.
+    - If Idempotency-Key is reused with a different payload, return 409.
+
+    Schema lives in Postgres (app.intake_jobs). We store meta inside the json payload
+    to avoid schema drift while still returning stable ids.
+    """
+
+    # Wrap payload with meta so the worker can write app.leads without relying on
+    in-memory state.
+    job_payload = {
+        "meta": {
+            "intake_id": intake_id,
+            "request_id": request_id,
+            "received_at_utc": received_at_utc,
+            "lead_source": lead_source,
+        },
+        "lead": payload,
+    }
+    payload_hash = _hash_payload(job_payload)
+
+    with conn.cursor(row_factory=dict_row) as cur:
+        if idempotency_key:
+            # If key exists, enforce payload match and return original meta.
+            cur.execute(
+                """
+                SELECT payload
+                FROM app.intake_jobs
+                WHERE idempotency_key = %s
+                LIMIT 1;
+                """,
+                (idempotency_key,),
+            )
+            row = cur.fetchone()
+            if row is not None:
+                existing_payload = row["payload"]
+                existing_hash = _hash_payload(existing_payload)
+                if existing_hash != payload_hash:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail={
+                            "status": "error",
+                            "request_id": request_id,
+                            "error": {
+                                "code": "IDEMPOTENCY_CONFLICT",
+                                "message": "Idempotency-Key reused with different payload",
+                                "details": [{"field": "Idempotency-Key", "issue": "payload_mismatch"}],
+                            },
+                        },
+                    )
+
+                meta = (existing_payload or {}).get("meta") or {}
+                return {
+                    "intake_id": meta.get("intake_id") or intake_id,
+                    "request_id": meta.get("request_id") or request_id,
+                    "received_at_utc": meta.get("received_at_utc") or received_at_utc,
+                }
+
+        # Insert new job
+        job_id = uuid.uuid4()
+        job_payload_json = json.dumps(job_payload, separators=(",", ":"), ensure_ascii=False)
+        cur.execute(
+            """
+            INSERT INTO app.intake_jobs (id, idempotency_key, payload, status, attempt_count, last_error, created_at, updated_at)
+            VALUES (%s, %s, %s::jsonb, 'queued', 0, NULL, NOW(), NOW());
+            """,
+            (job_id, idempotency_key, job_payload_json),
+        )
+    conn.commit()
+    return {
+        "intake_id": intake_id,
+        "request_id": request_id,
+        "received_at_utc": received_at_utc,
+    }
 
 
 def _get_leads_columns(conn: psycopg.Connection) -> Dict[str, str]:
@@ -279,7 +368,7 @@ def lead_health():
         "status": "ok",
         "service": SERVICE_NAME,
         "version": SERVICE_VERSION,
-        "queue": "stub",  # queue-first; real queue wired in PLAT_04
+        "queue": "pg_outbox",  # LEADGEN_07C: Postgres-only outbox queue
         "db": "configured" if (DB_DSN or DB_HOST) else "missing",
         "time_utc": _now_utc_iso(),
     }
@@ -329,49 +418,16 @@ async def lead_intake(
     # Normalize lead source (header overrides body context if present)
     lead_source = (x_lead_source or (payload.context.lead_source if payload.context else None) or "unknown").strip()
 
-    # Idempotency handling
-    if idempotency_key:
-        payload_hash = _hash_payload(payload.model_dump())
-        prior = _IDEMPOTENCY_STORE.get(idempotency_key)
-        if prior:
-            if prior["payload_hash"] != payload_hash:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={
-                        "status": "error",
-                        "request_id": req_id,
-                        "error": {
-                            "code": "IDEMPOTENCY_CONFLICT",
-                            "message": "Idempotency-Key reused with different payload",
-                            "details": [{"field": "Idempotency-Key", "issue": "payload_mismatch"}],
-                        },
-                    },
-                )
-            # Return original IDs (stable response)
-            return {
-                "status": "accepted",
-                "intake_id": prior["intake_id"],
-                "request_id": prior["request_id"],
-                "received_at_utc": prior["received_at_utc"],
-            }
+    intake_id = _new_id("li")
 
-        intake_id = _new_id("li")
-        _IDEMPOTENCY_STORE[idempotency_key] = {
-            "payload_hash": payload_hash,
-            "intake_id": intake_id,
-            "request_id": req_id,
-            "received_at_utc": received_at,
-        }
-    else:
-        intake_id = _new_id("li")
-
-    # Durable persistence (Wave 1): write to Postgres.
-    # This is the key contract: a lead is not "accepted" unless it's persisted.
+    # Durable enqueue (LEADGEN_07C): write to app.intake_jobs.
+    # This is the key contract: a lead is not "accepted" unless it's durably queued.
     dsn = _build_dsn()
     try:
         with psycopg.connect(dsn, connect_timeout=5) as conn:
-            _insert_lead(
+            meta = _enqueue_intake_job(
                 conn,
+                idempotency_key=idempotency_key,
                 intake_id=intake_id,
                 request_id=req_id,
                 received_at_utc=received_at,
@@ -386,7 +442,7 @@ async def lead_intake(
             detail={
                 "status": "error",
                 "request_id": req_id,
-                "error": {"code": "DB_ERROR", "message": "Failed to persist lead", "details": str(e)},
+                "error": {"code": "DB_ERROR", "message": "Failed to enqueue intake job", "details": str(e)},
             },
         )
 
@@ -397,7 +453,7 @@ async def lead_intake(
     print(json.dumps({
         "event": "lead_intake_accepted",
         "request_id": req_id,
-        "intake_id": intake_id,
+        "intake_id": meta.get("intake_id"),
         "lead_source": lead_source,
         "idempotency_key_present": bool(idempotency_key),
         "client_ip": client_host,
@@ -406,9 +462,9 @@ async def lead_intake(
 
     return {
         "status": "accepted",
-        "intake_id": intake_id,
-        "request_id": req_id,
-        "received_at_utc": received_at,
+        "intake_id": meta.get("intake_id"),
+        "request_id": meta.get("request_id"),
+        "received_at_utc": meta.get("received_at_utc"),
     }
 
 
